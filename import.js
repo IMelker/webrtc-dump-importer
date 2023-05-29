@@ -1,30 +1,4 @@
-const CORS_PROXY_SERVER = 'https://cors-anywhere.herokuapp.com/'
-
-function enableCorsServer() {
-    fetch(CORS_PROXY_SERVER + 'https://cors-anywhere.herokuapp.com/corsdemo')
-        .then(response => response.text())
-        .then(data => {
-            const tempDiv = document.createElement('div');
-            tempDiv.innerHTML = data;
-
-            console.log(data);
-
-            const input = tempDiv.querySelector('input[name="accessRequest"]');
-            if (input) {
-                console.info("Try to verify on CORS server");
-                fetch(CORS_PROXY_SERVER + CORS_PROXY_SERVER + 'corsdemo?accessRequest=' + input.value)
-                    .then(response => response.text())
-                    .then(result => {
-                        console.log(result);
-                    })
-                    .catch(error => console.log(error ? error : "Unknown error"));
-            }
-            else {
-                console.log("Already verified on CORS server ");
-            }
-        })
-        .catch(error => console.log(error));
-}
+const CORS_PROXY_SERVER = 'https://api.allorigins.win/raw?url='
 
 function fetchFile(path, callback) {
     var httpRequest = new XMLHttpRequest();
@@ -41,11 +15,12 @@ function fetchFile(path, callback) {
             var percentComplete = (event.loaded / event.total) * 100;
             document.getElementById('progress').innerHTML = percentComplete + '%';
         }
+        else {
+            document.getElementById('progress').innerHTML = 'IN PROGRESS: ' + event.loaded + ' bytes';
+        }
     };
   
     httpRequest.open('GET', CORS_PROXY_SERVER + path);
-    httpRequest.setRequestHeader("X-Requested-With", "XMLHttpRequest");
-    httpRequest.setRequestHeader("Origin", null);
     httpRequest.send();
 }
 
@@ -64,7 +39,7 @@ window.onload = function() {
         useReferenceTime.disabled = urlParams.get('referencetime') ? false : true;
         progress.hidden = false;
 
-        enableCorsServer();
+        //enableCorsServer();
 
         fetchFile(dumpUrl, (result) => {
             progress.hidden = true;
