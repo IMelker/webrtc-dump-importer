@@ -51,7 +51,7 @@ button.copyBtn {
         <p>This is an import tool for dumps from chrome://webrtc-internals. See <a href="http://testrtc.com/webrtc-internals-parameters/">this blog post</a> for a lengthy description of what it does and how to interpret some of the data.
         <form>
             <label>Select a WebRTC-internals JSON dump:</label>
-            <input type="file" onchange="doImport(event)">
+            <input type="file" id="importButton" onchange="doImport(event)">
             <br>
             <input type="checkbox" id="useReferenceTime"><label for="useReferenceTime">Use RTCPeerConnection creation time as start time for all graphs.</label>
         </form>

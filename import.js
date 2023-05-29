@@ -1,3 +1,39 @@
+window.onload = function() {
+    // get the value of the dumpurl query parameter from current URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const dumpUrl = urlParams.get('dumpurl');
+
+    // fetch the content of the URL stored in dumpurl query parameter
+    if (dumpUrl) {
+        let importButton = document.getElementById('importButton');
+        let useReferenceTime = document.getElementById('useReferenceTime');
+
+        importButton.disabled = true;
+        useReferenceTime.disabled = urlParams.get('referencetime') ? false : true;
+
+        fetch(dumpUrl)
+            .then(response => {
+                if (response.ok) {
+                    return response.text();
+                } else {
+                    throw new Error('Network response was not ok.');
+                }
+            })
+            .then(result => {
+                if (typeof result === 'object') {
+                    result = pako.inflate(result, {to: 'string'});
+                }
+                const theLog = JSON.parse(result);
+                importUpdatesAndStats(theLog);
+            })
+            .catch(error => {
+                importButton.disabled = false;
+                useReferenceTime.disabled = false;
+                console.error('Error fetching data:', error);
+            });
+    }
+}
+
 function doImport(evt) {
   evt.target.disabled = true;
   document.getElementById('useReferenceTime').disabled = true;
