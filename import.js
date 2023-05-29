@@ -7,9 +7,15 @@ function enableCorsServer() {
             const tempDiv = document.createElement('div');
             tempDiv.innerHTML = data;
 
+            console.log(data);
+
             const button = tempDiv.querySelector('input[type="submit"]');
             if (button) {
+                console.info("Try to verify on CORS server");
                 button.click();
+            }
+            else {
+                console.info("Already verified on CORS server ");
             }
         })
         .catch(error => console.error(error));
@@ -34,7 +40,7 @@ function fetchFile(path, callback) {
   
     httpRequest.open('GET', CORS_PROXY_SERVER + path);
     httpRequest.setRequestHeader("X-Requested-With", "XMLHttpRequest");
-    httpRequest.setRequestHeader("Origin", "*");
+    httpRequest.setRequestHeader("Origin", null);
     httpRequest.send();
 }
 
@@ -52,6 +58,8 @@ window.onload = function() {
         importButton.disabled = true;
         useReferenceTime.disabled = urlParams.get('referencetime') ? false : true;
         progress.hidden = false;
+
+        enableCorsServer();
 
         fetchFile(dumpUrl, (result) => {
             progress.hidden = true;
