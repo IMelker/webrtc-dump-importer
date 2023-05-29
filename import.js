@@ -1,3 +1,20 @@
+const CORS_PROXY_SERVER = 'https://cors-anywhere.herokuapp.com/'
+
+function enableCorsServer() {
+    fetch(CORS_PROXY_SERVER)
+        .then(response => response.text())
+        .then(data => {
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = data;
+
+            const button = tempDiv.querySelector('input[type="submit"]');
+            if (button) {
+                button.click();
+            }
+        })
+        .catch(error => console.error(error));
+}
+
 function fetchFile(path, callback) {
     var httpRequest = new XMLHttpRequest();
     httpRequest.onreadystatechange = function() {
@@ -15,7 +32,7 @@ function fetchFile(path, callback) {
         }
     };
   
-    httpRequest.open('GET', 'https://cors-anywhere.herokuapp.com/' + path);
+    httpRequest.open('GET', CORS_PROXY_SERVER + path);
     httpRequest.setRequestHeader("X-Requested-With", "XMLHttpRequest");
     httpRequest.setRequestHeader("Origin", "*");
     httpRequest.send();
