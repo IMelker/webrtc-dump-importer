@@ -7,7 +7,15 @@ function fetchFile(path, callback) {
             }
         }
     };
-    httpRequest.open('GET', path);
+
+    httpRequest.onprogress = function(event) {
+        if (event.lengthComputable) {
+            var percentComplete = (event.loaded / event.total) * 100;
+            document.getElementById('progress').innerHTML = percentComplete + '%';
+        }
+    };
+  
+    httpRequest.open('GET', 'https://cors-anywhere.herokuapp.com/' + path);
     httpRequest.send();
 }
 
@@ -18,19 +26,25 @@ window.onload = function() {
 
     // fetch the content of the URL stored in dumpurl query parameter
     if (dumpUrl) {
+        let progress = document.getElementById('progress');
         let importButton = document.getElementById('importButton');
         let useReferenceTime = document.getElementById('useReferenceTime');
 
         importButton.disabled = true;
         useReferenceTime.disabled = urlParams.get('referencetime') ? false : true;
+        progress.hidden = false;
 
         fetchFile(dumpUrl, (result) => {
+            progress.hidden = true;
             if (typeof result === 'object') {
                 result = pako.inflate(result, {to: 'string'});
             }
             const theLog = JSON.parse(result);
             importUpdatesAndStats(theLog);
         })
+    }
+    else {
+        document.getElementById('fileload').hidden = true;
     }
 }
 
