@@ -1,7 +1,7 @@
 const CORS_PROXY_SERVER = 'https://cors-anywhere.herokuapp.com/'
 
 function enableCorsServer() {
-    fetch(CORS_PROXY_SERVER)
+    fetch(CORS_PROXY_SERVER + 'https://cors-anywhere.herokuapp.com/corsdemo')
         .then(response => response.text())
         .then(data => {
             const tempDiv = document.createElement('div');
@@ -9,16 +9,21 @@ function enableCorsServer() {
 
             console.log(data);
 
-            const button = tempDiv.querySelector('input[type="submit"]');
-            if (button) {
+            const input = tempDiv.querySelector('input[name="accessRequest"]');
+            if (input) {
                 console.info("Try to verify on CORS server");
-                button.click();
+                fetch(CORS_PROXY_SERVER + CORS_PROXY_SERVER + 'corsdemo?accessRequest=' + input.value)
+                    .then(response => response.text())
+                    .then(result => {
+                        console.log(result);
+                    })
+                    .catch(error => console.log(error ? error : "Unknown error"));
             }
             else {
-                console.info("Already verified on CORS server ");
+                console.log("Already verified on CORS server ");
             }
         })
-        .catch(error => console.error(error));
+        .catch(error => console.log(error));
 }
 
 function fetchFile(path, callback) {
