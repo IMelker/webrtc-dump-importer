@@ -16,6 +16,7 @@ function fetchFile(path, callback) {
     };
   
     httpRequest.open('GET', 'https://cors-anywhere.herokuapp.com/' + path);
+    httpRequest.setRequestHeader("X-Requested-With", "XMLHttpRequest");
     httpRequest.send();
 }
 
