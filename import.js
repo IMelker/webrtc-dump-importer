@@ -45,7 +45,7 @@ window.onload = function() {
         })
     }
     else {
-        document.getElementById('fileload').hidden = true;
+        document.getElementById('fileload').hidden = false;
     }
 }
 
