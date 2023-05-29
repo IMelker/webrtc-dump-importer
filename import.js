@@ -1,3 +1,16 @@
+function fetchFile(path, callback) {
+    var httpRequest = new XMLHttpRequest();
+    httpRequest.onreadystatechange = function() {
+        if (httpRequest.readyState === 4) {
+            if (httpRequest.status === 200) {
+                if (callback) callback(httpRequest.responseText);
+            }
+        }
+    };
+    httpRequest.open('GET', path);
+    httpRequest.send();
+}
+
 window.onload = function() {
     // get the value of the dumpurl query parameter from current URL
     const urlParams = new URLSearchParams(window.location.search);
@@ -11,26 +24,13 @@ window.onload = function() {
         importButton.disabled = true;
         useReferenceTime.disabled = urlParams.get('referencetime') ? false : true;
 
-        fetch(dumpUrl)
-            .then(response => {
-                if (response.ok) {
-                    return response.text();
-                } else {
-                    throw new Error('Network response was not ok.');
-                }
-            })
-            .then(result => {
-                if (typeof result === 'object') {
-                    result = pako.inflate(result, {to: 'string'});
-                }
-                const theLog = JSON.parse(result);
-                importUpdatesAndStats(theLog);
-            })
-            .catch(error => {
-                importButton.disabled = false;
-                useReferenceTime.disabled = false;
-                console.error('Error fetching data:', error);
-            });
+        fetchFile(dumpUrl, (result) => {
+            if (typeof result === 'object') {
+                result = pako.inflate(result, {to: 'string'});
+            }
+            const theLog = JSON.parse(result);
+            importUpdatesAndStats(theLog);
+        })
     }
 }
 
