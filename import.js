@@ -1,4 +1,4 @@
-const CORS_PROXY_SERVER = 'https://api.allorigins.win/raw?url='
+const CORS_PROXY_SERVER = 'https://api.codetabs.com/v1/proxy?quest='
 
 function fetchFile(path, callback) {
     var httpRequest = new XMLHttpRequest();
