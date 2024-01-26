@@ -78,44 +78,7 @@ function doImport(evt) {
   }
 }
 
-function createLegacyCandidateTable(container, stun) {
-    // for ice candidates
-    const head = document.createElement('tr');
-    [
-        'Local address',
-        'Local type',
-        'Local id',
-        'Remote address',
-        'Remote type',
-        'Remote id',
-        'Requests sent', 'Responses received',
-        'Requests received', 'Responses sent',
-        'Active Connection',
-    ].forEach((text) => {
-        const el = document.createElement('td');
-        el.innerText = text;
-        head.appendChild(el);
-    });
-    container.appendChild(head);
-
-    for (t in stun) {
-        const row = document.createElement('tr');
-        [
-            'googLocalAddress', 'googLocalCandidateType', 'localCandidateId',
-            'googRemoteAddress', 'googRemoteCandidateType', 'remoteCandidateId',
-            'requestsSent', 'responsesReceived',
-            'requestsReceived', 'responsesSent',
-            'googActiveConnection', /* consentRequestsSent, */
-        ].forEach((id) => {
-            const el = document.createElement('td');
-            el.innerText = stun[t][id];
-            row.appendChild(el);
-        });
-        container.appendChild(row);
-    }
-}
-
-function createSpecCandidateTable(container, allStats) {
+function createCandidateTable(container, allStats) {
     const head = document.createElement('tr');
     [
         'Transport id',
@@ -128,6 +91,8 @@ function createSpecCandidateTable(container, allStats) {
         'protocol',
         'priority / relayProtocol',
         'interface',
+        'requestsSent / responsesReceived',
+        'requestsReceived / responsesSent',
     ].forEach((text) => {
         const el = document.createElement('td');
         el.innerText = text;
@@ -197,6 +162,12 @@ function createSpecCandidateTable(container, allStats) {
                 el = document.createElement('td');
                 if (i === 8) {
                     el.innerText = pair.priority;
+                } else if (i === 10) {
+                    el.innerText = (pair.requestsSent + pair.consentRequestsSent) + ' / ' + pair.responsesReceived;
+                    if (pair.bytesSent) el.innerText += '\nPayload bytesSent=' + pair.bytesSent;
+                } else if (i === 11) {
+                    el.innerText = pair.requestsReceived + ' / ' + pair.responsesSent;
+                    if (pair.bytesReceived) el.innerText += '\nPayload bytesReceived=' + pair.bytesReceived;
                 }
                 row.appendChild(el);
             }
@@ -242,6 +213,9 @@ function createSpecCandidateTable(container, allStats) {
                 el = document.createElement('td');
                 el.innerText = candidate.networkType || 'unknown';
                 row.appendChild(el);
+
+                row.appendChild(document.createElement('td'));
+                row.appendChild(document.createElement('td'));
 
                 container.appendChild(row);
             }
@@ -338,7 +312,9 @@ function processGUM(data) {
 
     container.appendChild(table);
 
-    const columns = ['request_type', 'origin', 'pid', 'rid', 'audio', 'video', 'audio_track_info', 'video_track_info', 'error', 'error_message'];
+    const columns = ['request_type', 'origin', 'pid', 'rid',
+       'audio', 'video', 'audio_track_info', 'video_track_info',
+       'error', 'error_message'];
     const displayNames = {
         request_id: 'id',
         reqest_type: 'type',
@@ -473,22 +449,7 @@ function processTraceEvent(table, event) {
             row.style.backgroundColor = 'red';
             break;
         }
-    } else if (event.type === 'iceConnectionStateChange') {
-        // Legacy variant, probably broken by now since the values changed.
-        switch(event.value) {
-        case 'ICEConnectionStateConnected':
-        case 'ICEConnectionStateCompleted':
-        case 'kICEConnectionStateConnected':
-        case 'kICEConnectionStateCompleted':
-            row.style.backgroundColor = 'green';
-            break;
-        case 'ICEConnectionStateFailed':
-        case 'kICEConnectionStateFailed':
-            row.style.backgroundColor = 'red';
-            break;
-        }
     }
-
     table.appendChild(row);
 }
 
@@ -530,41 +491,17 @@ function importUpdatesAndStats(data) {
                 containers[connid].signalingState.textContent += ' => ' + event.value;
             }
         });
-        const stun = {};
+        let legacy = false;
         for (reportname in connection.stats) {
             if (reportname.startsWith('Conn-')) {
-                let t = reportname.split('-');
-                const comp = t.pop();
-                t = t.join('-');
-                if (!stun[t]) stun[t] = {};
-                const stats = JSON.parse(connection.stats[reportname].values);
-                switch(comp) {
-                case 'requestsSent':
-                case 'consentRequestsSent':
-                case 'responsesSent':
-                case 'requestsReceived':
-                case 'responsesReceived':
-                case 'localCandidateId':
-                case 'remoteCandidateId':
-                case 'googLocalAddress':
-                case 'googRemoteAddress':
-                case 'googLocalCandidateType':
-                case 'googRemoteCandidateType':
-                case 'googActiveConnection':
-                    //console.log(t, comp, connection.stats[reportname]);
-                    stun[t][comp] = stats[stats.length - 1];
-                    break;
-                default:
-                    //console.log(reportname, comp, stats);
-                }
+                legacy = true;
+                break;
             }
         }
-
-        if (Object.keys(stun).length === 0) {
-            // spec-stats. A bit more complicated... we need the transport and then the candidate pair and the local/remote candidates.
-            createSpecCandidateTable(containers[connid].candidates, connection.stats);
+        if (!legacy) {
+            createCandidateTable(containers[connid].candidates, connection.stats);
         } else {
-            createLegacyCandidateTable(containers[connid].candidates, stun);
+            document.getElementById('legacy').style.display = 'block';
         }
     }
     // then, update the stats displays
@@ -583,6 +520,12 @@ function processConnections(connectionIds, data) {
     graphs[connid] = {};
     const reportobj = {};
     let values;
+
+    for (reportname in connection.stats) {
+        if (reportname.startsWith('Conn-')) {
+            return; // legacy stats, no longer supported. Warning is shown above.
+        }
+    }
     for (reportname in connection.stats) {
         // special casing of computed stats, in particular [a-b]
         if (reportname.indexOf('[') !== -1) {
@@ -602,35 +545,22 @@ function processConnections(connectionIds, data) {
         values = JSON.parse(connection.stats[reportname].values);
         startTime = new Date(connection.stats[reportname].startTime).getTime();
         endTime = new Date(connection.stats[reportname].endTime).getTime();
-        values = values.map((currentValue, index) => [startTime + 1000 * index, currentValue]);
+        // Individual timestamps were added in crbug.com/1462567 in M117.
+        if (connection.stats[stat + '-timestamp']) {
+            const timestamps = JSON.parse(connection.stats[stat + '-timestamp'].values);
+            values = values.map((currentValue, index) => [timestamps[index], currentValue]);
+        } else {
+            // Fallback to the assumption that stats were gathered every second.
+            values = values.map((currentValue, index) => [startTime + 1000 * index, currentValue]);
+        }
         reportobj[stat].push([comp, values, connection.stats[reportname].statsType]);
     }
 
-
-    // sort so we get a more useful order of graphs (for legacy):
-    // * ssrcs
-    // * bwe
-    // * everything else alphabetically
-    let names = Object.keys(reportobj);
-    const ssrcs = names.filter(name => name.startsWith('ssrc_')).sort((a, b) => { // sort by send/recv and ssrc
-        const aParts = a.split('_');
-        const bParts = b.split('_');
-        if (aParts[2] === bParts[2]) {
-            return parseInt(aParts[1], 10) - parseInt(bParts[1], 10);
-        } else if (aParts[2] === 'send') return -1;
-        return 1;
-    });
-    const bwe = names.filter(name => name === 'bweforvideo');
-    names = names.filter(name => !name.startsWith('ssrc_') && name !== 'bweforvideo');
-    names = ssrcs.concat(bwe, names);
-    names.forEach(reportname => {
+    Object.keys(reportobj).forEach(reportname => {
         const reports = reportobj[reportname];
         const statsType = reports[0][2];
         // ignore useless graphs
         if (['local-candidate', 'remote-candidate', 'codec', 'stream', 'track'].includes(statsType)) return;
-        if (reportname.startsWith('Cand-') || reportname.startsWith('Channel')) return;
-        if (reportname.startsWith('RTCIceCandidate_')) return;
-        if (reportname.startsWith('RTCCodec_')) return;
 
         const series = [];
         series.statsType = statsType;
@@ -640,7 +570,7 @@ function processConnections(connectionIds, data) {
             if (name === 'kind' || name === 'mediaType') {
                 series.kind = data[0][1];
             }
-            if (name === 'trackIdentifier' || name === 'googTrackId') {
+            if (name === 'trackIdentifier') {
                 series.trackIdentifier = data[0][1];
             }
             if (name === 'ssrc') {
@@ -660,35 +590,97 @@ function processConnections(connectionIds, data) {
                     }
                     plotBands.push({
                         from: item[0],
-                        to: (values[index + 1] || [])[0]
+                        to: (values[index + 1] || [])[0],
+                        label: {
+                            align: 'center',
+                            text: 'sender disabled',
+                        },
                     });
                 });
                 return;
             }
-            if (['encoderImplementation', 'decoderImplementation'].includes(name)) {
-                // TODO: avoid "unknown"
-                series[name] = data[0][1];
-            }
-            if (name === 'mid') {
-                series.mid = data[0][1];
+            if (name === 'qualityLimitationReason' && statsType === 'outbound-rtp') {
+                // set up a x-axis plotbands:
+                // https://www.highcharts.com/docs/chart-concepts/plot-bands-and-plot-lines
+                data.filter((el, index, values) => {
+                    return !(index > 0 && index < values.length - 1 && values[index - 1][1] == el[1]);
+                }).forEach((item, index, values) => {
+                    if (item[1] === 'none') {
+                        return;
+                    }
+                    plotBands.push({
+                        from: item[0],
+                        to: (values[index + 1] || [])[0],
+                        label: {
+                            align: 'center',
+                            text: item[1] + '-limited',
+                        },
+                    });
+                });
                 return;
             }
-            if (name  === 'rid') {
-                series.rid = data[0][1];
+            if (['encoderImplementation', 'decoderImplementation'].includes(name) && ['inbound-rtp', 'outbound-rtp'].includes(statsType)) {
+                // set up a x-axis plotbands:
+                // https://www.highcharts.com/docs/chart-concepts/plot-bands-and-plot-lines
+                data.filter((el, index, values) => {
+                    return !(index > 0 && index < values.length - 1 && values[index - 1][1] == el[1]);
+                }).forEach((item, index, values) => {
+                    plotBands.push({
+                        from: item[0],
+                        to: (values[index + 1] || [])[0],
+                        label: {
+                            align: 'left',
+                            text: name + ': ' + item[1],
+                        },
+                        color: index % 2 === 0 ? 'white' : 'rgba(253, 253, 222, 0.3)',
+                    });
+                });
+                return;
+            }
+            if (name === 'scalabilityMode' && statsType === 'outbound-rtp') {
+                // set up a x-axis plotbands:
+                // https://www.highcharts.com/docs/chart-concepts/plot-bands-and-plot-lines
+                data.filter((el, index, values) => {
+                    return !(index > 0 && index < values.length - 1 && values[index - 1][1] == el[1]);
+                }).forEach((item, index, values) => {
+                    plotBands.push({
+                        from: item[0],
+                        to: (values[index + 1] || [])[0],
+                        label: {
+                            align: 'right',
+                            text: name + ': ' + item[1],
+                            y: 30,
+                        },
+                        // This one is fully transparent (white with 100% alpha) since it overlaps with encoderImplementation.
+                        color: (255, 255, 255, 1),
+                        // But has a 1px border so it is possible to see changes unrelated to codec switches.
+                        borderWidth: 1,
+                        borderColor: 'rgba(189, 189, 189, 0.3)',
+                    });
+                });
                 return;
             }
 
-            // On legacy stats convert bits sent/received to kbits
-            if (name === 'bitsReceivedPerSecond' || name === 'bitsSentPerSecond') {
-                name = 'k' + name;
-                data = data.map(el => [el[0], Math.floor(el[1] / 1000)]);
+            const statsForLabels = [
+                'mid', 'rid',
+                'ssrc', 'rtxSsrc', 'fecSsrc',
+                'encoderImplementation', 'decoderImplementation', 'scalabilityMode',
+                'scalabilityMode', '[codec]',
+                'label', // for datachannels
+            ];
+            if (statsForLabels.includes(name)) {
+                series[name] = data[0][1];
             }
+            series.id = reportname;
 
             if (typeof(data[0][1]) !== 'number') return;
             const ignoredSeries = [
+                'timestamp',
                 'protocol', 'dataChannelIdentifier',
                 'streamIdentifier', 'trackIdentifier',
                 'priority', 'port',
+                'ssrc', 'rtxSsrc', 'fecSsrc',
+                'mid', 'rid',
             ];
             if (ignoredSeries.includes(name)) {
                 return;
@@ -698,18 +690,13 @@ function processConnections(connectionIds, data) {
                 'bytesReceived', 'bytesSent',
                 'headerBytesReceived', 'headerBytesSent',
                 'packetsReceived', 'packetsSent',
-                'qpSum', 'estimatedPlayoutTimestamp',
-                'framesEncoded', 'framesDecoded',
+                'qpSum',
+                'framesEncoded', 'framesDecoded', 'totalEncodeTime',
                 'lastPacketReceivedTimestamp', 'lastPacketSentTimestamp',
-                'remoteTimestamp',
+                'remoteTimestamp', 'estimatedPlayoutTimestamp',
                 'audioInputLevel', 'audioOutputLevel',
-                'totalSamplesDuration',
-                'totalSamplesReceived', 'jitterBufferEmittedCount',
-                // legacy
-                'googDecodingCTN', 'googDecodingCNG', 'googDecodingNormal',
-                'googDecodingPLCCNG', 'googDecodingCTSG', 'googDecodingMuted',
-                'googEchoCancellationEchoDelayStdDev',
-                'googCaptureStartNtpTimeMs',
+                'totalSamplesDuration', 'totalSamplesReceived',
+                'jitterBufferEmittedCount',
             ];
             const secondYAxis = [
                 // candidate-pair
@@ -717,9 +704,9 @@ function processConnections(connectionIds, data) {
                 // data-channel
                 '[messagesReceived/s]', '[messagesSent/s]',
                 // inbound-rtp
-                '[framesReceived/s]', '[framesDecoded/s]', '[keyFramesDecoded/s]',
+                '[framesReceived/s]', '[framesDecoded/s]', '[keyFramesDecoded/s]', 'frameWidth', 'frameHeight',
                 // outbound-rtp'
-                '[framesSent/s]', '[framesEncoded/s]', '[keyFramesEncoded/s]',
+                '[framesSent/s]', '[framesEncoded/s]', '[keyFramesEncoded/s]', 'frameWidth', 'frameHeight',
             ];
 
             series.push({
@@ -748,24 +735,22 @@ function processConnections(connectionIds, data) {
             if (series.statsType) {
                 container.attributes['data-statsType'] = series.statsType;
             }
-            // open certain legacy reports by default.
-            container.open = reportname.startsWith('ssrc_') ||
-                reportname === 'bweforvideo' ||
-                (reportname.startsWith('Conn-') && reportname.indexOf('-1-0') !== -1);
             containers[connid].graphs.appendChild(container);
-
+            // TODO: keep in sync with
+            // https://source.chromium.org/chromium/chromium/src/+/main:content/browser/webrtc/resources/stats_helper.js
             const title = [
-                series.statsType ? 'type=' + series.statsType : '',
-                series.kind ? 'kind=' + series.kind : '',
-                series.ssrc !== undefined ? 'ssrc=' + series.ssrc.toString(16) : '',
-                series.mid !== undefined ? 'mid=' + series.mid : '',
-                series.rid !== undefined ? 'rid=' + series.rid : '',
-                series.label ? 'label=' + series.label : '',
-                series.encoderImplementation ? 'encoderImplementation="' + series.encoderImplementation + '"': '',
-                series.decoderImplementation ? 'decoderImplementation="' + series.decoderImplementation + '"': '',
-                series.trackIdentifier ? 'track=' + series.trackIdentifier : '',
-                'id=' + reportname,
-            ].filter(s => s !== '').join(' ');
+                'statsType', 'kind',
+                'ssrc', 'rtxSsrc', 'fecSsrc',
+                'mid', 'rid',
+                'label',
+                '[codec]',
+                'encoderImplementation', 'decoderImplementation',
+                'trackIdentifier',
+                'id',
+            ].filter(key => series[key] !== undefined)
+            .map(key => {
+                return ({statsType: 'type', trackIdentifier: 'track'}[key] || key) + '=' + JSON.stringify(series[key]);
+            }).join(', ');
             const titleElement = document.createElement('summary');
             titleElement.innerText = title;
             container.appendChild(titleElement);
